@@ -1,0 +1,474 @@
+#include<queue>
+#include<iostream>
+#include<string>
+#include<fstream>
+
+using namespace std;
+
+//initating a doctor
+struct Doctor {
+	//a doctor has a name,specialization,consultationfee
+	string name;
+	string specialization;
+	int consultationFee;
+};
+//struct patient
+struct Patient {
+	//a patient has a name and phone number
+	string name, phoneNum;
+};
+
+//A struct for the appointments 
+struct Appointment {
+	//each appointment will contain a doctor a patient and a specific time
+	Doctor dr;
+	Patient patient;
+	string time;
+};
+
+//Initiating a linked list to store the drs in
+struct Node {
+	//the data of the linked list is a dr and it is a simple linked list pointing to the next dr
+	Doctor dr;
+	Node* next = nullptr;
+};
+struct LinkedList {
+	Node* head = nullptr;
+	//Function to append the dr
+	void append(Doctor dr) {
+		Node* n = new Node;
+		n->dr = dr;
+		//if the list is still empty the head is simply the new node
+		if (head == nullptr) {
+			head = n;
+		}
+		//else go to the end thus the nullptr
+		else {
+			Node* cur = head;
+			while (cur->next != nullptr) {
+				cur = cur->next;
+			}
+			cur->next = n;
+
+		}
+	}
+	//a member function to print all details about a Dr written recursively
+	void printList(Node* p) {
+		//base case
+		if (p == nullptr)
+			return;
+		cout << "Dr Name:" << p->dr.name << "-Specialization:" << p->dr.specialization
+			<< "-ConsultationFee:" << p->dr.consultationFee << endl;
+		return printList(p->next);//return with the next node as parameter
+	}
+	//helper function
+	void printList() {
+		//making sure list is nnot empty
+		if (head == nullptr) {
+			cout << "List Is Empty";
+			return;
+		}
+		//else call the print func with the initial pointer as the head of the list
+		printList(head);
+	}
+};
+
+//intiating the function prototypes
+//Function#1
+bool validatePhoneNum(string num);
+//Function#2
+int compareAppointments(Appointment a1, Appointment a2);
+//Function#3
+bool validateTime(string time);
+//Function#4
+void readDrFromFile(LinkedList& DrList);
+//Function#5
+Doctor* selectDoctor(LinkedList DrList, string name);
+//Function#6
+Patient* enterPatientDetails();
+//Function#7
+string enterTime();
+//Function#8
+bool AddAppointment(queue<Appointment>& app, Appointment a1);
+//Function#9
+void printDetails(queue<Appointment> q);
+//Function#10
+void printSpecialization(LinkedList DrList, string specialization);
+//Function#11
+int calculateAmount(queue<Appointment> q, string name, LinkedList DrList);
+//Function#12
+string convertToTime(double i);
+//Function#13
+void printAvailableTime(queue<Appointment> q);
+
+int main() {
+	//initiating a Dr List to hold all the drs available in the text file
+	LinkedList DrList;
+	//a queue appointment since appointments are first in first out
+	queue<Appointment> appointments;
+	//read the file of drs and store them
+	readDrFromFile(DrList);
+
+	//if the list is empty end the program
+	if (!DrList.head) {
+		cout << "No drs available-Program Execution Stopped" << endl;
+		return 0;
+	}
+	//initializing a choice variable for the switch case
+	int choice;
+	do {
+		//menu options
+		cout << "Select what you want to do:"
+			<< "\n\t1-Add An Appointment"
+			<< "\n\t2-See All Appointment Details"
+			<< "\n\t3-See The Doctors In A Specific Specialization"
+			<< "\n\t4-report the total fees a doctor earned throughout all appointments."
+			<< "\n\t5-See available time slots"
+			<< "\n\t6-Exit" << endl;
+		//getting the choice
+		cin >> choice;
+		//switch case start
+		switch (choice) {
+		case 1: {
+			//initiating the appointment to add
+			Appointment a;
+			//initiating a dr to add as a pointer since the func return a doctor pointer
+			Doctor* d;
+			do {
+				//ask for the dr wished for the program will keep running as long as the select doctor returns null
+				cout << "Enter the name of the doctor you wish to schedule an appointment with:" << endl;
+				DrList.printList();
+				cout << endl;
+				string name;
+				getline(cin >> ws, name);
+				d = selectDoctor(DrList, name);
+			} while (!d);//null as in not found
+			//the appointment a will be held with this dr
+			a.dr = *d;
+			//calling the function to fill out patient details
+			a.patient = *enterPatientDetails();
+			do {
+				a.time = enterTime();//function to enter the time
+			} while (!AddAppointment(appointments, a));//as long as there is no conflict while adding the appointment
+		}
+			  break;
+		case 2:
+			//case 2 func to print details
+			printDetails(appointments);
+			break;
+		case 3: {
+			//enter the specialization u wish to see the dr of
+			string spec;
+			cout << "Enter the specialization you wish to look for:"
+				<< "\n\tCardiology-Dermatology-Neurology-Endocrinology";
+			cin >> spec;
+			//calling function that will print the list
+			printSpecialization(DrList, spec);
+		}
+			  break;
+		case 4: {
+			//getting the dr we want to see the revenue of
+			string DrName;
+			cout << "Enter the name of the doctor you want to see the total fees of:";
+			getline(cin >> ws, DrName);
+			double x = calculateAmount(appointments, DrName, DrList);
+			//if the calculate amount returns 0 it means he had no consultation for the day
+			if (x == 0) {
+				cout << "The doctor had no appointment" << endl;
+			}
+			else//else cout the amount
+				cout << "The amount made for Dr " << DrName << " = " << x << "$" << endl;
+		}
+			  break;
+
+		case 5:
+			printAvailableTime(appointments);
+			break;
+		}
+	} while (choice != 6);
+	return 0;
+}
+
+
+
+bool validatePhoneNum(string num) {
+	//a Phone number has a form of XX-XXXXXX
+	//9 characters if less or more return false
+	if (num.length() != 9)
+		return false;
+	//checking the dash
+	if (num[2] != '-')
+		return false;
+	//checking if the rest is digits
+	for (int i = 0; i < num.length(); i++)
+		if (i != 2)
+			if (!isdigit(num[i]))//if not digit false
+				return false;
+	//return true at the end if nothing returned false
+	return true;
+}
+
+int compareAppointments(Appointment a1,Appointment a2) {
+	//they have the same format XX:XX and since it's military time we just have to check which is bigger or smaller
+	if (a1.time < a2.time)
+		return 1;//1 a1 is ahead of a2 
+	if (a1.time > a2.time)
+		return -1;//-1 a2 is ahead of a1
+	return 0;//equal times
+}
+
+bool validateTime(string time) {
+	//Validate Time has format XX:XX
+	//the length should be 5
+	if (time.length() != 5)
+		return false;
+	//have a : on position 2
+	if (time[2] != ':')
+		return false;
+	//the first digit can only be 0 or 1
+	if (time[0] != '0' && time[0] != '1')
+		return false;
+	//in case it is 0
+	if (time[0] == '0')
+		//the second digit can only be 08 or 09
+		if (time[1] < '8' || time[1]>'9')
+			return false;
+	//if first digit is 1
+	if (time[0] == '1') 
+		//we can go from 10 till 15
+		if (time[1] < '0' || time[1] >= '5')
+			return false;//last time is 15:30 16 is not included
+	//The minutes can only be either 00 or 30
+	if (time[3] != '0' && time[3] != '3')
+		return false;
+	if (time[4] != '0')
+		return false;
+	// if all these cases are valid return true
+	return true;
+}
+
+//A function that will read all drs from file and append them to the dr linked list passed by reference
+void readDrFromFile(LinkedList& DrList) {
+	//opening stream
+	ifstream input("Doctors.txt");
+	//making sure file exists
+	if (input.fail()) {
+		cout << "File does not exist";
+		return;
+	}
+	//if it does exist initiate the Dr it will hold
+	Doctor dr;
+	//it will be reading 2 strings and 1 int from the file
+	string name, specilization;
+	int consultationfee;
+	while (!input.eof()) {
+		getline(input >> ws, name);
+		getline(input >> ws, specilization);
+		if (input >> consultationfee);//making sure that last part of file is the consultation fee of the last dr
+		else
+			return;
+		//initiating the dr and calling the append function
+		dr = { name,specilization,consultationfee };
+		DrList.append(dr);
+	}
+	//close stream
+	input.close();
+	cout << "Done";
+}
+
+Doctor* selectDoctor(LinkedList DrList, string name) {
+	//go through the linked list
+	
+	Node* cur = DrList.head;
+	while (cur != nullptr) {
+		//if found return a pointer to that dr
+		if (cur->dr.name == name) {
+			return &cur->dr;		
+		}
+		cur = cur->next;
+	}
+	//else return a null ptr
+	cout << "Doctor Not Found" << endl;
+	return nullptr;
+}
+
+Patient* enterPatientDetails() {
+	//initiating a new patient by pointer so when it returns it won't delete
+	Patient* p = new Patient;
+	//asking the user to input name
+	cout << "Enter Patient Name:";
+	getline(cin, p->name);
+
+	//for the phone number keep repeting until it is valid
+	do {
+		cout << "Enter Patient's Phone Number:(00-000000)";
+		cin >> p->phoneNum;
+	} while (!validatePhoneNum(p->phoneNum));
+	return p;//return the patient pointer
+}
+
+string enterTime() {
+	//a func to enter time and keep re-checking if it's valid following the format XX:00 or XX:30
+	//we initiating a string time to return
+	string time;
+	do {
+		std::cout << "Enter the time of the appointment wished:"
+			<< "\n\tMake sure the time entered is from 8-4"
+			<< "\n\tAfter 12 the time should be inputed in 24hr format(13-14...)"
+			<< "\n\tschedules are only appointed at XX:00 or XX:30" << endl;
+		cin >> time;
+		
+	} while (!validateTime(time));
+	return time;
+}
+
+bool AddAppointment(queue<Appointment>& app,Appointment a1) {
+	//func to add appointments while keeping the order from first to last
+	queue<Appointment> extra;
+	//we can have a maximum of 16 appointments per day if the size is 16 return false means no apppointments were taken
+	if (app.size() == 16)
+	{
+		cout << "All Appointments Are taken" << endl;
+		return false;
+	}
+	//while we compare appointments as long as it's equal to one meaning it is smaller 
+	while (!app.empty() && compareAppointments(app.front(), a1) == 1) {
+		//put all smaller appointments in extra queue
+		extra.push(app.front());
+		app.pop();
+	}
+	//once we find one that is bigger or equal
+	if (!app.empty() && compareAppointments(app.front(), a1) == 0) {
+		//if equal to 0 make sure to return the queue to original state
+		while (!app.empty()) {
+			extra.push(app.front());
+			app.pop();
+		}
+		while (!extra.empty()) {
+			app.push(extra.front());
+			extra.pop();
+		}
+		//return false appointment is already existing
+		cout << "Appointment Already Existing" << endl;
+		return false;
+	}
+	//else means it was bigger push the appointment in the extra queue then the rest of original queue
+	extra.push(a1);
+	while (!app.empty()) {
+		extra.push(app.front());
+		app.pop();
+	}
+	//return all the extra queue to original
+	while (!extra.empty()) {
+		app.push(extra.front());
+		extra.pop();
+	}
+	cout << "Appointment added" << endl;
+	return true;
+}
+
+void printDetails(queue<Appointment> q) {
+	//print all queue details
+	//if empty no appointments taken
+	if (q.empty())
+	{
+		cout << "No appointments taken yet" << endl;
+		return;
+	}
+	//else do a while loop until it is empty
+	while (!q.empty()) {
+		cout << "Dr name:" << q.front().dr.name << " specialization:" << q.front().dr.specialization << " consultation fee:"
+			<< q.front().dr.consultationFee << "\nPatient's name:" << q.front().patient.name << " Phone Number:"
+			<< q.front().patient.phoneNum << "\nTime:" << q.front().time << endl;
+		q.pop();
+	}
+}
+
+void printSpecialization(LinkedList DrList, string specialization) {
+	//go through all Dr List and print the names of the drs where string passed= name of their specialization
+	Node* cur = DrList.head;
+	if (!cur) {
+		cout << "Drs list is empty" << endl;
+	}
+	//bool to print that no dr was found in case we went through all the list without it changing to true
+	bool found = false;
+	//we move the cur
+	while (cur != nullptr) {
+		if (cur->dr.specialization == specialization) {
+			cout << cur->dr.name << " ";
+			found = true;
+		}
+		cur = cur->next;
+	}
+	if (!found)
+		cout << "No dr found in that specialization";
+	cout << endl;
+}
+
+//func to calculate the earning of a dr per day
+int calculateAmount(queue<Appointment> q, string name,LinkedList DrList) {
+	//initiate a counter to see how many appointments the dr received
+	int count = 0;
+	//we start by selecting a dr from the list
+	Doctor* d = selectDoctor(DrList, name);
+	if (!d) {
+		//in case the func returned null ptr return -1 
+		cout << "Doctor Not found";
+		return -1;
+	}
+	//if the dr is found check all queue appointments each time we find the name add to count
+	while (!q.empty()) {
+		if (q.front().dr.name == name) {
+			count++;
+		}
+		q.pop();
+	}
+	//return the count * the dr's consultation fee
+	return d->consultationFee * count;
+}
+
+string convertToTime(double i) {
+	//initiating an empty string to concatinate
+	string s = "";
+	//the time passed is a double so to get the num without the coma we cast to int
+	int x = i;
+	//if the num if smaller than 10 we add a 0 at the beginning
+	if (i < 10)
+		s += "0";
+	//then we add the num x to the string followed by :
+	s += to_string(x);
+	s += ":";
+
+	//to get whether the comma was 8.0 or 8.5 we do *10=80 or 85 %10= 0 or 5
+	if (int(i * 10) % 10 == 5) {
+		s += "30";
+	}
+	else
+		s += "00";
+	return s;
+}
+
+void printAvailableTime(queue<Appointment> q) {
+	//initiating a string s that will hold the conversion from double to XX:XX format
+	string s;
+	//looping from 8 til 3:30
+	for (double i = 8; i <= 15.5; i += 0.5) {
+		//calling the function convert to time
+		s = convertToTime(i);
+		//checking if the queue holding the appointments is empty
+		if (!q.empty()) {
+			//if it's not empty and s is smaller that means it would be the first appointment
+			if (s < q.front().time)
+				cout << s << " ";
+			//if it's bigger or equal we just pop the time until we have a time where it's smaller 
+			if (s >= q.front().time)
+				q.pop();
+		}
+		else {
+			//if q is empty cout all times
+			cout << s << " ";
+		}
+	}
+	cout << endl;
+}
+
